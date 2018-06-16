@@ -36,10 +36,10 @@ class ObfuscatorController extends Controller
                     $item['color'] = 'warning';
                     break;
                 case 'error':
-                    $item['color'] = 'danger';
+                    $item['color'] = 'emergency';
                     break;
                 case 'success':
-                    $item['color'] = 'success';
+                    $item['color'] = 'notice';
                     break;
                 default:
                     $item['color'] = 'info';

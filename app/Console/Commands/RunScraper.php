@@ -14,17 +14,21 @@ class RunScraper extends Command
      *
      * @var string
      */
-    protected $signature = 'scraper:run';
+    protected $signature = 'scraper:run 
+                                {--i|infinite : Whether to ignore term count and run forever } 
+                                {--pp|per-page=10 : How many results to display in results } 
+                                {--term_count=10 : How many search terms to process }';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Command description';
+    protected $description = 'Runs the scraper as an obfuscator';
 
 
     protected $chrome;
+
     /**
      * 
      */
@@ -85,29 +89,34 @@ class RunScraper extends Command
      */
     public function handle()
     {
+        $options = $this->options();
+        $arguments = $this->arguments();
 
-        $this->browser->browse(function ($browser) {
+        $this->browser->browse(function ($browser) use ($options){
 
             $this->loginToChrome($browser);
 
             // This wordlist contains thousands of random words that can obfuscate your search history.
             $wordlist = \Storage::get('wordlist.json');
-            $array = json_decode($wordlist, true);
+            $search_terms = json_decode($wordlist, true);
 
-            // Pick a set of random words
-            $search_terms = array_rand($array, 10);
+            if(!$this->option('infinite')){
+                // Pick a set of random words
+                $search_terms = array_rand($search_terms, $this->option('term_count'));
+            } else { 
+                $search_terms = array_keys($search_terms);
+                shuffle($search_terms);
+            }
 
-            activity()->log('Starting obfuscator with the following terms: '.implode(', ', $search_terms));
+            activity()->log('Starting obfuscator with the following terms: '.implode(', ', array_slice($search_terms, 0, $this->option('term_count'))));
 
             // Amount of search results to visit.
-            $per_page = 10;
+            $per_page = $this->option('per-page');
             $url_google = 'https://google.com?num='.$per_page;
 
             foreach ($search_terms as $query) {
 
                 // Start entering the query
-
-
                 try{
 
                     $browser->visit($url_google);
@@ -122,39 +131,47 @@ class RunScraper extends Command
                         // Store the current result page.
                         $begin_url = $browser->driver->getCurrentUrl();
 
-                        activity()->log('Getting results for: '. $query);
+                        activity()->withProperties(['level' => 'info'])->log('Getting results for: '. $query);
                         
-
+                        $tries = 0;
                         // Loop through the available results
 
                         for ($i = 1; $i<=$per_page; $i++) {
-                            
-                                // $browser->assertPresent('.g');
 
-                                $element = $browser->element('.g:nth-child('.$i.') .r > a');
+                                if($tries <= 5){
+                                    // $browser->assertPresent('.g');
 
-                                // Checks if the result element is clickable so we can continue
-                                if($element){
-                                    $element->click();
-                                
-                                    $browser->waitUntilMissing('body');
+                                    $element = $browser->element('.g:nth-child('.$i.') .r > a');
 
-                                    if ($begin_url !== $browser->driver->getCurrentUrl()){
+                                    // Checks if the result element is clickable so we can continue
+                                    if($element){
+                                        $element->click();
+                                    
+                                        $browser->waitUntilMissing('body');
 
-                                        $browser->script('window.scrollTo(0, 500);');
+                                        if ($begin_url !== $browser->driver->getCurrentUrl()){
 
-                                        activity()->withProperties(['level' => 'success'])->log('Visiting url '.$i.': '.$browser->driver->getCurrentUrl());
+                                            $browser->script('window.scrollTo(0, 500);');
 
-                                        $browser->visit($begin_url)->waitUntilMissing('body');
+                                            activity()->withProperties(['level' => 'success'])->log('Visiting url '.$i.': '.$browser->driver->getCurrentUrl());
+
+                                            $browser->visit($begin_url)->waitUntilMissing('body');
+
+                                        } else {
+                                            activity()->withProperties(['level' => 'alert'])->log('Url currently matches starting url.. Retrying.');
+                                        }
 
                                     } else {
-                                        activity()->withProperties(['level' => 'alert'])->log('Url currently matches starting url.. Retrying.');
-                                    }
-
+                                        activity()->withProperties(['level' => 'alert'])->log('Element unaccesible. Skipping..');
+                                        $this->alert('Element unaccesible. Skipping..');
+                                        $tries++;
+                                    }    
                                 } else {
-                                    activity()->withProperties(['level' => 'alert'])->log('Element unaccesible. Skipping..');
-                                    $this->alert('Element unaccesible. Skipping..');
+                                    $tries = 0;
+                                    $browser->visit($url_google);
                                 }
+                            
+                                
                         }
                     });
                 } catch (\Exception $e){
