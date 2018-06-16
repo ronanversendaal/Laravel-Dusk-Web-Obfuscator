@@ -2,6 +2,10 @@
 
 @section('title', app_name() . ' | ' . __('menus.backend.obfuscator.logs'))
 
+@push('after-styles')
+    @include('log-viewer::_template.style')
+@endpush
+
 @section('page-header')
     <h5 class="mb-4">Obfuscator Logs
         <small class="text-muted">by <a href="https://ronanversendaal.com" target="_blank">Ronan Versendaal</a></small>
@@ -29,21 +33,24 @@
                     <tr>
                         <th>Log description</th>
                         <th>Logged at</th>
+                        <th>Log level</th>
                         <th class="text-right">Actions</th>
                     </tr>
                     </thead>
                     <tbody>
                     @if ($rows->count() > 0)
                         @foreach($rows->items() as $activity)
-                            <tr class="bg-{{$activity['color']}}">
+                            <tr>
                                 {{-- {{dd($activity)}} --}}
                                 @foreach($activity as $key => $value)
-                                    @if(in_array($key, ['description','created_at']))
-                                        <td class="{{ $key !== 'created_at' ? 'text-left' : 'text-center' }}">
+                                    @if(in_array($key, ['description','created_at', 'properties']))
+                                        <td class="{{ !in_array($key, ['created_at', 'properties']) ? 'text-left' : 'text-center' }} dont-break-out">
                                             @if ($key == 'created_at')
                                                 <a href="{{ route('log-viewer::logs.show', [$value]) }}" class="btn btn-sm btn-primary">
                                                     {{ $value }}
                                                 </a>
+                                            @elseif($key == 'properties')
+                                                <span class="badge level level-{{$activity['color']}}">{{$activity['properties']->get('level')}}</span>
                                             @else
                                                 <span class="{{ $key }}">{{ $value }}</span>
                                             @endif
@@ -71,18 +78,6 @@
             </div><!--table-responsive-->
         </div>
     </div>
-    <div class="row">
-        <div class="col">
-            <div class="card">
-                <div class="card-header">
-                    <strong>{{__('menus.backend.obfuscator.logs')}}</strong>
-                </div><!--card-header-->
-                <div class="card-block">
-                    
-                </div><!--card-block-->
-            </div><!--card-->
-        </div><!--col-->
-    </div><!--row-->
     <div class="row">
         <div class="col">
             {!! $rows->render('log-viewer::_pagination.bootstrap-4') !!}
